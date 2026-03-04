@@ -1,0 +1,36 @@
+# ════════════════════════════════════════════════════════════
+#  QUANT·IA — B3 Terminal
+#  requirements.txt
+#
+#  Instalação:
+#    pip install -r requirements.txt
+#
+#  Python 3.10+ obrigatório
+#  Sistema operacional: Windows 10/11 (MetaTrader5 requer Windows)
+# ════════════════════════════════════════════════════════════
+
+
+# ── API e servidor ────────────────────────────────────────────
+fastapi>=0.110.0          # Framework da API REST e WebSocket
+uvicorn>=0.29.0           # Servidor ASGI para rodar o FastAPI
+pydantic>=2.0.0           # Validação de modelos de dados (usado pelo FastAPI)
+
+
+# ── Inteligência Artificial ───────────────────────────────────
+google-generativeai>=0.7.0  # SDK do Google Gemini (análise do screener)
+
+
+# ── Dados e mercado ───────────────────────────────────────────
+pandas>=2.0.0             # Leitura, manipulação e exportação do CSV screener
+yfinance>=0.2.40          # Cotações históricas e notícias via Yahoo Finance
+requests>=2.31.0          # HTTP para scraping (Fundamentus, fontes externas)
+
+
+# ── MetaTrader 5 ──────────────────────────────────────────────
+# Requer MetaTrader 5 instalado e logado no Windows
+# Download: pelo portal da sua corretora (BTG ou Toro)
+MetaTrader5>=5.0.45       # API Python oficial do MT5 (envio de ordens para B3)
+
+
+# ── Configuração e ambiente ───────────────────────────────────
+python-dotenv>=1.0.0      # Leitura do arquivo .env com credenciais
