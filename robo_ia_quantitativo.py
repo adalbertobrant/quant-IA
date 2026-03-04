@@ -16,7 +16,7 @@ import pandas as pd
 import yfinance as yf
 import MetaTrader5 as mt5
 from dotenv import load_dotenv
-from utils.utils import normalize_csv, print_report
+from utils import normalize_csv, print_report
 
 # ==========================================
 # LOGGING ESTRUTURADO
@@ -87,22 +87,83 @@ STATE = SessionState()
 # ==========================================
 # 4. CONEXÃO COM MT5
 # ==========================================
+def _gerar_otp() -> str:
+    """
+    Gera o código OTP de 6 dígitos se MT5_OTP_SECRET estiver configurado no .env.
+    Retorna string vazia se OTP não estiver configurado ou pyotp não instalado.
+    """
+    secret = os.getenv("MT5_OTP_SECRET", "").strip()
+    if not secret:
+        return ""
+    try:
+        import pyotp
+        totp   = pyotp.TOTP(secret)
+        codigo = totp.now()
+        restam = 30 - (int(time.time()) % 30)
+        log.info(f"🔐 OTP gerado: {codigo} (válido por {restam}s)")
+        return codigo
+    except ImportError:
+        log.warning("MT5_OTP_SECRET configurado mas pyotp não instalado. "
+                    "Execute: pip install pyotp")
+        return ""
+    except Exception as e:
+        log.error(f"Erro ao gerar OTP: {e}")
+        return ""
+
+
 def conectar_mt5() -> bool:
-    """Inicializa e autentica no MetaTrader 5."""
+    """
+    Inicializa e autentica no MetaTrader 5.
+
+    Fluxo:
+      1. mt5.initialize() — conecta ao terminal MT5 já aberto na máquina
+      2. Gera OTP automaticamente se MT5_OTP_SECRET estiver no .env
+      3. mt5.login() com senha normal ou senha+OTP conforme necessário
+      4. Tenta até 3 vezes em caso de falha transitória
+    """
+    # Passo 1: inicializa o terminal
     if not mt5.initialize():
-        log.error("Falha ao inicializar o MT5.")
+        log.error(f"Falha ao inicializar o MT5. "
+                  f"Verifique se o terminal está aberto e logado. "
+                  f"Erro: {mt5.last_error()}")
         return False
 
-    authorized = mt5.login(MT5_LOGIN, password=MT5_PASSWORD, server=MT5_SERVER)
-    if not authorized:
-        log.error(f"Falha de autenticação MT5. Erro: {mt5.last_error()}")
-        mt5.shutdown()
-        return False
+    # Passo 2: prepara credenciais com OTP se necessário
+    otp   = _gerar_otp()
+    senha = f"{MT5_PASSWORD}{otp}" if otp else MT5_PASSWORD
 
-    info = mt5.account_info()
-    log.info(f"✅ Conectado | Corretora: {BROKER_NAME} | Conta: {info.login} "
-             f"| Saldo: R$ {info.balance:,.2f} | Margem Livre: R$ {info.margin_free:,.2f}")
-    return True
+    if otp:
+        log.info("🔐 Autenticação com 2FA/OTP ativada.")
+
+    # Passo 3: login com retry
+    for tentativa in range(1, 4):
+        authorized = mt5.login(MT5_LOGIN, password=senha, server=MT5_SERVER)
+
+        if authorized:
+            info = mt5.account_info()
+            log.info(
+                f"✅ Conectado | Corretora: {BROKER_NAME} | "
+                f"Conta: {info.login} | "
+                f"Saldo: R$ {info.balance:,.2f} | "
+                f"Margem Livre: R$ {info.margin_free:,.2f}"
+            )
+            return True
+
+        erro = mt5.last_error()
+        log.warning(f"Tentativa {tentativa}/3 falhou. MT5 erro: {erro}")
+
+        # Se o OTP expirou entre tentativas, gera um novo
+        if otp and tentativa < 3:
+            log.info("🔐 Regenerando OTP para nova tentativa...")
+            otp   = _gerar_otp()
+            senha = f"{MT5_PASSWORD}{otp}" if otp else MT5_PASSWORD
+
+        time.sleep(2)
+
+    log.error("❌ Falha ao autenticar no MT5 após 3 tentativas.")
+    mt5.shutdown()
+    return False
+
 
 
 def obter_saldo() -> float:
