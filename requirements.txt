@@ -34,3 +34,7 @@ MetaTrader5>=5.0.45       # API Python oficial do MT5 (envio de ordens para B3)
 
 # ── Configuração e ambiente ───────────────────────────────────
 python-dotenv>=1.0.0      # Leitura do arquivo .env com credenciais
+
+# ── Chaves OTP MT5  ───────────────────────────────────
+pyotp>=2.9.0
+
